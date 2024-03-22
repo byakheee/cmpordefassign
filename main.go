@@ -16,7 +16,7 @@ var (
 	logger      *slog.Logger
 	hasProblem  bool
 	showVersion *bool
-	version     = "v0.2.1"
+	version     = "v0.2.2"
 )
 
 func init() {
@@ -146,16 +146,21 @@ func analyzeFile(filePath string) {
 			// 変数の再代入をチェック
 			assignStmt, ok := stmt.(*ast.AssignStmt)
 			if ok && assignStmt.Tok == token.ASSIGN {
-				varName := assignStmt.Lhs[0].(*ast.Ident).Name
-				if _, ok := declaredVars[varName]; ok {
-					// この変数はif文のスコープ内で宣言されているため、エラー条件から除外する
-					continue
-				}
+				for _, lhs := range assignStmt.Lhs {
+					ident, ok := lhs.(*ast.Ident)
+					if !ok {
+						continue
+					}
+					if _, ok := declaredVars[ident.Name]; ok {
+						// この変数はif文のスコープ内で宣言されているため、エラー条件から除外する
+						continue
+					}
 
-				// 変数が再代入されているため、cmp.Orを使用することが推奨される
-				hasProblem = true
-				pos := fset.Position(ifStmt.Pos())
-				fmt.Printf("%s:%d:%d: consider using cmp.Or (cmpordefassign)\n", pos.Filename, pos.Line, pos.Column)
+					// 変数が再代入されているため、cmp.Orを使用することが推奨される
+					hasProblem = true
+					pos := fset.Position(ifStmt.Pos())
+					fmt.Printf("%s:%d:%d: consider using cmp.Or (cmpordefassign)\n", pos.Filename, pos.Line, pos.Column)
+				}
 			}
 		}
 		return true
