@@ -16,12 +16,14 @@ var (
 	logger      *slog.Logger
 	hasProblem  bool
 	showVersion *bool
-	version     = "v0.2.2"
+	version     = "v0.3.0"
+	ignoreList  = []string{}
 )
 
 func init() {
 	verbose := flag.Bool("v", false, "Enable verbose logging")
 	showVersion = flag.Bool("version", false, "Prints the version of the program")
+	ignoreDirs := flag.String("ignore", "", "Comma-separated list of directories to ignore (matched by prefix)")
 	flag.Parse()
 
 	var handler *slog.TextHandler
@@ -32,6 +34,11 @@ func init() {
 		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	}
 	logger = slog.New(handler)
+
+	if *ignoreDirs != "" {
+		logger.Debug("Set ignoring flag.", "dirs", *ignoreDirs)
+		ignoreList = strings.Split(*ignoreDirs, ",")
+	}
 }
 
 func main() {
@@ -96,6 +103,12 @@ func analyzePath(path string) {
 }
 
 func analyzeFile(filePath string) {
+	for _, ignore := range ignoreList {
+		if strings.HasPrefix(filePath, ignore) {
+			logger.Debug("Ignoring file.", "file", filePath)
+			return
+		}
+	}
 	logger.Debug("Analyzing file.", "file", filePath)
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, filePath, nil, parser.ParseComments)
