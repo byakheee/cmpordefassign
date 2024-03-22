@@ -148,8 +148,7 @@ func analyzeFile(filePath string) {
 				// 変数が再代入されているため、cmp.Orを使用することが推奨される
 				hasProblem = true
 				pos := fset.Position(ifStmt.Pos())
-				file := fmt.Sprintf("%s:%d", pos.Filename, pos.Line)
-				logger.Info("Consider using cmp.Or for:", "variable", varName, "file", file)
+				fmt.Printf("%s:%d:%d: consider using cmp.Or (cmpordefassign)\n", pos.Filename, pos.Line, pos.Column)
 			}
 		}
 		return true
