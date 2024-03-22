@@ -16,7 +16,7 @@ var (
 	logger      *slog.Logger
 	hasProblem  bool
 	showVersion *bool
-	version     = "v0.2.0"
+	version     = "v0.2.1"
 )
 
 func init() {
@@ -37,7 +37,7 @@ func init() {
 func main() {
 	paths := flag.Args()
 	if *showVersion {
-		fmt.Println("cmporlinter ", version)
+		fmt.Println("cmpordefassign ", version)
 		os.Exit(0)
 	}
 	if len(paths) < 1 {
