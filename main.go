@@ -13,12 +13,15 @@ import (
 )
 
 var (
-	logger     *slog.Logger
-	hasProblem bool
+	logger      *slog.Logger
+	hasProblem  bool
+	showVersion *bool
+	version     = "v0.2.0"
 )
 
 func init() {
 	verbose := flag.Bool("v", false, "Enable verbose logging")
+	showVersion = flag.Bool("version", false, "Prints the version of the program")
 	flag.Parse()
 
 	var handler *slog.TextHandler
@@ -33,6 +36,10 @@ func init() {
 
 func main() {
 	paths := flag.Args()
+	if *showVersion {
+		fmt.Println("cmporlinter ", version)
+		os.Exit(0)
+	}
 	if len(paths) < 1 {
 		logger.Error("Usage: cmporlinter <path> [<path> ...]")
 		os.Exit(2)
