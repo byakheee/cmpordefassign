@@ -16,7 +16,7 @@ var (
 	logger      *slog.Logger
 	hasProblem  bool
 	showVersion *bool
-	version     = "v0.3.0"
+	version     = "v0.3.1"
 	ignoreList  = []string{}
 )
 
@@ -117,62 +117,103 @@ func analyzeFile(filePath string) {
 		return
 	}
 
+	// ゼロ値で初期化された変数を記録するマップ
+	zeroValueVars := make(map[string]struct{})
+
 	ast.Inspect(node, func(n ast.Node) bool {
-		// if文を探す
-		ifStmt, ok := n.(*ast.IfStmt)
-		if !ok {
-			return true
-		}
-		logger.Debug("Found if statement.", "line", fset.Position(ifStmt.Pos()).Line)
+		switch n := n.(type) {
+		case *ast.IfStmt:
+			logger.Debug("Found if statement.", "line", fset.Position(n.Pos()).Line)
 
-		// if 文が二項式か、さらにオペレーターが '!=' かどうかを確認
-		binExpr, ok := ifStmt.Cond.(*ast.BinaryExpr)
-		if !ok || binExpr.Op != token.NEQ {
-			return true
-		}
-		logger.Debug("Found '!=' in if statement.")
+			// if 文が二項式か、さらにオペレーターが '!=' かどうかを確認
+			binExpr, ok := n.Cond.(*ast.BinaryExpr)
+			if !ok || binExpr.Op != token.NEQ {
+				return true
+			}
+			logger.Debug("Found '!=' in if statement.")
 
-		// `!=` 演算子の右辺がnilもしくはゼロ値かどうかをチェック
-		if !(isNil(binExpr.Y) || isZeroValue(binExpr.Y)) {
-			return true
-		}
-		logger.Debug("Found nil or zero value in if statement.")
+			// `!=` 演算子の右辺がnilもしくはゼロ値かどうかをチェック
+			if !(isNil(binExpr.Y) || isZeroValue(binExpr.Y)) {
+				return true
+			}
+			logger.Debug("Found nil or zero value in if statement.")
 
-		// if文のスコープ内で宣言された変数の名前を記録するマップ
-		declaredVars := make(map[string]struct{})
+			// if文のスコープ内で宣言された変数の名前を記録するマップ
+			declaredVars := make(map[string]struct{})
 
-		// 変数の再代入をチェック
-		for _, stmt := range ifStmt.Body.List {
-			// 変数宣言をチェック
-			declStmt, ok := stmt.(*ast.DeclStmt)
-			if ok {
-				genDecl, ok := declStmt.Decl.(*ast.GenDecl)
-				if ok && genDecl.Tok == token.VAR {
-					for _, spec := range genDecl.Specs {
-						valueSpec := spec.(*ast.ValueSpec)
-						for _, name := range valueSpec.Names {
-							declaredVars[name.Name] = struct{}{}
+			// 変数の再代入をチェック
+			for _, stmt := range n.Body.List {
+				// 変数宣言をチェック
+				declStmt, ok := stmt.(*ast.DeclStmt)
+				if ok {
+					genDecl, ok := declStmt.Decl.(*ast.GenDecl)
+					if ok && genDecl.Tok == token.VAR {
+						for _, spec := range genDecl.Specs {
+							valueSpec := spec.(*ast.ValueSpec)
+							for _, name := range valueSpec.Names {
+								declaredVars[name.Name] = struct{}{}
+							}
 						}
 					}
 				}
-			}
-			// 変数の再代入をチェック
-			assignStmt, ok := stmt.(*ast.AssignStmt)
-			if ok && assignStmt.Tok == token.ASSIGN {
+				// 変数の再代入をチェック
+				assignStmt, ok := stmt.(*ast.AssignStmt)
+				if !ok || assignStmt.Tok != token.ASSIGN {
+					// 代入文でない場合はスキップ
+					continue
+				}
 				for _, lhs := range assignStmt.Lhs {
 					ident, ok := lhs.(*ast.Ident)
 					if !ok {
+						// 代入先が変数でない場合はスキップ
 						continue
 					}
 					if _, ok := declaredVars[ident.Name]; ok {
 						// この変数はif文のスコープ内で宣言されているため、エラー条件から除外する
 						continue
 					}
+					if _, ok := zeroValueVars[ident.Name]; ok {
+						// ゼロ値で初期化された変数はエラー条件から除外する
+						continue
+					}
 
 					// 変数が再代入されているため、cmp.Orを使用することが推奨される
 					hasProblem = true
-					pos := fset.Position(ifStmt.Pos())
-					fmt.Printf("%s:%d:%d: consider using cmp.Or (cmpordefassign)\n", pos.Filename, pos.Line, pos.Column)
+					pos := fset.Position(n.Pos())
+					fmt.Printf(
+						"%s:%d:%d: Variable: %s can be assigned in cmp.Or (cmpordefassign)\n",
+						pos.Filename,
+						pos.Line,
+						pos.Column,
+						ident.Name)
+				}
+
+			}
+		case *ast.GenDecl:
+			// ゼロ値で初期化されている変数を記録
+			logger.Debug("Found general declaration.", "line", fset.Position(n.Pos()).Line)
+			if n.Tok == token.VAR {
+				for _, spec := range n.Specs {
+					valueSpec := spec.(*ast.ValueSpec)
+					for _, name := range valueSpec.Names {
+						if valueSpec.Values == nil {
+							// varでゼロ値に初期化されている変数を記録
+							zeroValueVars[name.Name] = struct{}{}
+						}
+					}
+				}
+			}
+		case *ast.AssignStmt:
+			// 代入文でゼロ値に初期化されている変数を記録
+			logger.Debug("Found assignment statement.", "line", fset.Position(n.Pos()).Line)
+			if n.Tok == token.DEFINE {
+				for i, rhs := range n.Rhs {
+					if isNil(rhs) || isZeroValue(rhs) {
+						ident, ok := n.Lhs[i].(*ast.Ident)
+						if ok {
+							zeroValueVars[ident.Name] = struct{}{}
+						}
+					}
 				}
 			}
 		}

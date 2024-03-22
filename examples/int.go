@@ -35,7 +35,7 @@ func Int() {
 		log.Println(shouldNotErr)
 	}
 
-	// This code should not error. cmp.Orに置き換えられないため
+	// This code should not error. ifの条件式によって、cmp.Orに置き換えられないため
 	shouldNotErr := 4
 	if g := retIntPointer(); g != nil {
 		if isTrue() {
@@ -43,8 +43,29 @@ func Int() {
 		}
 	}
 
+	// This code should not error. cmp.Orでの置き換え先もゼロ値であり、置き換えられないため
+	var shouldNotErr2 *int
+	if h := retIntPointer(); h != nil {
+		shouldNotErr2 = h
+	}
+
+	// This code should not error. cmp.Orでの置き換え先もゼロ値であり、置き換えられないため
+	var shouldNotErr3 int
+	if i := retInt(); i != 0 {
+		shouldNotErr3 = i
+	}
+
+	// This code should not error. cmp.Orでの置き換え先もゼロ値であり、置き換えられないため
+	shouldNotErr4 := 0
+	if j := retInt(); j != 0 {
+		shouldNotErr4 = j
+	}
+
 	log.Println(shouldErr)
 	log.Println(shouldNotErr)
+	log.Println(shouldNotErr2)
+	log.Println(shouldNotErr3)
+	log.Println(shouldNotErr4)
 }
 
 func retIntPointer() *int {
