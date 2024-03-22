@@ -17,17 +17,25 @@ if v := fuga(); v != nil {
 hoge := cmp.Or(fuga(), "init")
 ```
 
+# Install
+
+```
+go install github.com/byakheee/cmpordefassign
+```
+
 # Usage
 
-対象のファイルにエラーがなければ Exitcode: 0
-エラーがあれば Exitcode: 1
-入力に問題があれば Exitcode: 2
+対象のファイルにエラーがなければ Exitcode: 0.
+
+エラーがあれば Exitcode: 1.
+
+入力に問題があれば Exitcode: 2.
 
 ```sh
 cmpordefassign ./...
 ```
 
-# tests
+# Test
 
 ```
 go run main.go ./examples/...
